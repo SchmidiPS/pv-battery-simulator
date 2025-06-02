@@ -1,0 +1,22 @@
+﻿name: battery-sim
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # Core
+  - pvlib
+  - pandas
+  - numpy
+  - scipy
+  # UI / Web
+  - streamlit
+  - matplotlib
+  - plotly
+  - seaborn
+  # Backend
+  - fastapi
+  - uvicorn
+  # PDF
+  - fpdf2
+  # Dev / Test
+  - pytest

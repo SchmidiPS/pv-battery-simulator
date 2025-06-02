@@ -1,29 +1,11 @@
-import pandas as pd
 import matplotlib.pyplot as plt
-from core.pv_sim import simulate_pv
-from core.battery import simulate_battery
+import pandas as pd
 
-def demo_battery_sim():
-    # 24h Zeitachse
-    idx = pd.date_range("2022-06-01", periods=24, freq="H")
-    
-    # Verbrauch: 2 kW konstant
-    load = pd.Series(2.0, index=idx)
-    
-    # PV: 0 am Morgen/Abend, 4 kW von 10–16 Uhr
-    pv = pd.Series(0.0, index=idx)
-    pv[10:17] = 4.0
-
-    # Batterie-Simulation
-    result = simulate_battery(
-        load=load,
-        pv=pv,
-        capacity_kwh=10,
-        charge_power_kw=3,
-        discharge_power_kw=3
-    )
-
-    # Plot
+def plot_battery_result(load: pd.Series, pv: pd.Series, result: pd.DataFrame):
+    """
+    Erstellt einen 3-teiligen Plot: Last/PV, SOC, Netzimport/-export.
+    Gibt die Matplotlib-Figur zurück.
+    """
     fig, ax = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
 
     ax[0].plot(load, label="Last [kW]", linestyle="--")
@@ -41,9 +23,5 @@ def demo_battery_sim():
     ax[2].legend()
 
     plt.xlabel("Zeit")
-    plt.suptitle("Batterie-Simulation – 1 Tag")
     plt.tight_layout()
-    plt.show()
-
-if __name__ == "__main__":
-    demo_battery_sim()
+    return fig

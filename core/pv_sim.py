@@ -6,8 +6,8 @@ def simulate_pv(lat, lon, kwp, tilt=30, azimuth=180):
     df, meta = iotools.get_pvgis_hourly(
         latitude=lat,
         longitude=lon,
-        startyear=2020,
-        endyear=2020,
+        start=2020,
+        end=2020,
         raddatabase="PVGIS-SARAH",
         peakpower=kwp,
         angle=tilt,

@@ -8,7 +8,7 @@ def simulate_pv(
     year: int = 2022,
     tilt: float = 30,
     azimuth: float = 180,
-    raddatabase: str = "PVGIS-SARAH",
+    raddatabase: str = "PVGIS-SARAH3",
     loss: float = 14,
     timezone: str = "Europe/Vienna"
 ) -> pd.Series:

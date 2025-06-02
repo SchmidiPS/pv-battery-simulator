@@ -28,7 +28,7 @@ def simulate_pv(
     Returns:
     - Pandas Series mit stündlichem Ertrag in kW
     """
-    df, meta = iotools.get_pvgis_hourly(
+    df, meta, _ = iotools.get_pvgis_hourly(
         latitude=lat,
         longitude=lon,
         start=year,

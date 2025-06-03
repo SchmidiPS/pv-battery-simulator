@@ -45,6 +45,7 @@ LANG: dict[str, dict[str, str]] = {
         "modes": "Betriebsmodi",
         "pv_tab": "PV‑Konfiguration",
         "batt_tab": "Batterie & Modi",
+        "economics_tab": "Wirtschaftlichkeit & KPIs",
         "result_tab": "Simulation & Plots",
         "run": "Simulation starten",
         "save": "Szenario speichern",
@@ -62,6 +63,7 @@ LANG: dict[str, dict[str, str]] = {
         "modes": "Operating modes",
         "pv_tab": "PV configuration",
         "batt_tab": "Battery & modes",
+        "economics_tab": "Economics & KPIs",
         "result_tab": "Simulation & plots",
         "run": "Run simulation",
         "save": "Save scenario",
@@ -69,6 +71,7 @@ LANG: dict[str, dict[str, str]] = {
         "export": "PDF export",
     },
 }
+
 
 # ─────────────────────────── Sidebar (UI) ───────────────────────────────
 with st.sidebar:
@@ -165,13 +168,6 @@ if "lat" in st.session_state and "lon" in st.session_state:
 
     st_folium(map_view, use_container_width=True, height=700)
 
-
-# KPI‑Badges (Dummy bis zur Simulation)
-col_a, col_b, col_c = st.columns(3)
-col_a.metric("Autarkie", "–")
-col_b.metric("Amortisation", "–")
-col_c.metric("NPV", "–")
-
 st.divider()
 
 
@@ -179,7 +175,13 @@ if "simulation_done" not in st.session_state:
     st.session_state.simulation_done = False
 
 # Tabs
-pv_tab, batt_tab, result_tab = st.tabs([T["pv_tab"], T["batt_tab"], T["result_tab"]])
+pv_tab, batt_tab, econ_tab, result_tab = st.tabs([
+    T["pv_tab"],
+    T["batt_tab"],
+    T["economics_tab"],
+    T["result_tab"],
+])
+
 
 # ───────── Tab 1 – PV Konfiguration ───────────────────────────────────
 with pv_tab:
@@ -197,9 +199,12 @@ with pv_tab:
 with batt_tab:
     st.header(T["batt_tab"])
     c1, c2, c3 = st.columns(3)
-    capacity_kwh = c1.number_input("Batterie kWh", value=15.0, min_value=1.0)
-    power_kw = c2.number_input("Leistung kW", value=5.0, min_value=0.5)
-    efficiency = c3.slider("Wirkungsgrad %", 80, 99, 95)
+    st.session_state.capacity_kwh = c1.number_input("Batterie kWh", value=15.0, min_value=1.0)
+    st.session_state.power_kw = c2.number_input("Inverter Leistung kW", value=5.0, min_value=0.5)
+    st.session_state.efficiency = c3.slider("Wirkungsgrad %", 80, 99, 95)
+    c4 = st.columns(1)[0]
+    st.session_state.cycles_dod = c4.number_input("Zyklen bei 70% DoD", value=4000, min_value=100, max_value=20000)
+
 
     st.divider()
     if "Peak Shaving" in selected_modes:
@@ -213,6 +218,24 @@ with batt_tab:
             critical_load = st.number_input("Kritische Last kW", value=2.0)
 
 
+with econ_tab:
+    st.header("💰 Wirtschaftlichkeitsparameter")
+
+    c1, c2, c3 = st.columns(3)
+    st.session_state.price_pv_kwp = c1.number_input("PV‑Kosten (€/kWp)", value=1000.0, min_value=0.0)
+    st.session_state.price_batt_kwh = c2.number_input("Batterie‑Kosten (€/kWh)", value=700.0, min_value=0.0)
+    st.session_state.install_costs = c3.number_input("Installationskosten pauschal (EUR)", value=3000.0, min_value=0.0)
+
+    c4, c5 = st.columns(2)
+    st.session_state.price_buy = c4.number_input("Strombezugspreis (€/kWh)", value=0.30, format="%.2f")
+    st.session_state.price_feed = c5.number_input("Einspeisetarif (€/kWh)", value=0.08, format="%.2f")
+
+    c6, c7 = st.columns(2)
+    st.session_state.discount_rate = c6.number_input("Diskontsatz (%)", value=5.0, format="%.1f") / 100
+    st.session_state.lifetime_years = c7.number_input("Nutzungsdauer (Jahre)", value=20, step=1)
+
+
+
 # ───────── Tab 3 – Simulation & Plots ──────────────────────────────────
 with result_tab:
     sim_placeholder = st.empty()
@@ -220,7 +243,7 @@ with result_tab:
     if st.button(T["run"], use_container_width=True):
         from core.pv_sim import simulate_pv
         from core.battery import simulate_battery
-        from core.visualize import plot_full_simulation_with_irradiance
+        from core.visualize import plot_full_simulation_with_irradiance, plot_daily_energy_flows
 
         sim_placeholder.info("⏳ Simulation läuft …")
 
@@ -229,14 +252,17 @@ with result_tab:
         ghi_total = None
         for _, pv_row in st.session_state.pv_arrays.iterrows():
             pv_series, ghi_series = simulate_pv(
-                lat, lon,
-                pv_row["kWp"],
-                year,
-                pv_row["Tilt"],
-                pv_row["Azimut"]
-            )
-            pv_total = pv_series if pv_total is None else pv_total.add(pv_series, fill_value=0)
-            ghi_total = ghi_series if ghi_total is None else ghi_total.add(ghi_series, fill_value=0)
+            lat=lat,
+            lon=lon,
+            kwp=pv_row["kWp"],
+            tilt=pv_row["Tilt"],
+            azimuth=pv_row["Azimut"],
+            loss=14,
+            coerce_year=year
+        )
+        
+        pv_total = pv_series if pv_total is None else pv_total.add(pv_series, fill_value=0)
+        ghi_total = ghi_series if ghi_total is None else ghi_total.add(ghi_series, fill_value=0)
 
         # Lastserie
         if load_df is None:
@@ -248,23 +274,76 @@ with result_tab:
         result = simulate_battery(
             load_series,
             pv_total,
-            capacity_kwh,
-            power_kw,
-            power_kw,
-            efficiency / 100
+            st.session_state.capacity_kwh,
+            st.session_state.power_kw,
+            st.session_state.power_kw,
+            st.session_state.efficiency / 100
         )
+        
+        # Systemparameter nach Simulation anzeigen
+        st.subheader("🔋 Systemübersicht")
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        col1.metric("PV-Leistung (kWp)", f"{st.session_state.pv_arrays['kWp'].sum():.2f}")
+        col2.metric("Batterie-Kapazität (kWh)", f"{st.session_state.capacity_kwh:.1f}")
+        col3.metric("WR-Leistung (kW)", f"{st.session_state.power_kw:.1f}")
+        col4.metric("Jahreslast (kWh)", f"{load_series.sum():,.0f}")
+        col5.metric("PV-Ertrag (kWh)", f"{pv_total.sum():,.0f}")
+
+        # ───────── KPIs anzeigen – nach Systemübersicht, vor Plot ─────────
+        autarkie = 100 * (1 - result["grid_import"].sum() / load_series.sum())
+
+        # Investitionskosten berechnen
+        pv_kwp = st.session_state.pv_arrays["kWp"].sum()
+        pv_cost = pv_kwp * st.session_state.price_pv_kwp
+        batt_cost = st.session_state.capacity_kwh * st.session_state.price_batt_kwh
+        install_cost = st.session_state.install_costs
+        total_investment = pv_cost + batt_cost + install_cost
+
+        # Einsparungen pro Jahr
+        grid_import = result["grid_import"].sum()
+        grid_export = result["grid_export"].sum()
+        savings_per_year = grid_import * st.session_state.price_buy - grid_export * st.session_state.price_feed
+
+        # Amortisation & Kapitalwert
+        amortisation_years = total_investment / savings_per_year if savings_per_year > 0 else float("inf")
+        npv = sum([
+            savings_per_year / ((1 + st.session_state.discount_rate) ** t)
+            for t in range(1, st.session_state.lifetime_years + 1)
+        ]) - total_investment
+
+
+        # Lebensdauerberechnung basierend auf SOC-Zyklen
+        soc_normalized = result["soc_%"] / 100
+        soc_diff = soc_normalized.diff().abs()
+        total_cycles = soc_diff.sum() / 2  # entspricht Vollzyklen
+
+        # Lebensdauer (Jahre) schätzen – st.session_state.cycles_dod muss vorhanden sein
+        sim_years = len(result) / 8760  # 8760 Stunden/Jahr
+        batt_lifetime_years = (st.session_state.cycles_dod / total_cycles) * sim_years if total_cycles > 0 else float("inf")
+
+        st.subheader("📈 Wirtschaftlichkeit")
+
+        # KPI‑Badges anzeigen
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Gesamtkosten", f"{total_investment:,.0f} €")
+        col2.metric("Ersparnis / Jahr", f"{savings_per_year:,.0f} €")
+        col3.metric("Autarkie", f"{autarkie:.1f} %")
+
+        col4, col5, col6 = st.columns(3)
+        col4.metric("Amortisation", f"{amortisation_years:.1f} Jahre" if amortisation_years < 100 else "–")
+        col5.metric("Batterielebensdauer", f"{batt_lifetime_years:.1f} Jahre")
+        col6.metric("NPV", f"{npv:,.0f} €")
+
+
+        st.subheader("📊 Visualisierung der Simulation")
 
         # Visualisierung
         fig = plot_full_simulation_with_irradiance(load_series, pv_total, ghi_total, result)
         st.pyplot(fig, use_container_width=True)
 
-        # KPI minimal
-        autarkie = 100 * (1 - result["grid_import"].sum() / load_series.sum())
-        amort = "–"  # TODO: Wirtschaftlichkeits‑Modul
-        npv = "–"    # TODO: Wirtschaftlichkeits‑Modul
-        col_a.metric("Autarkie", f"{autarkie:.1f}%")
-        col_b.metric("Amortisation", amort)
-        col_c.metric("NPV", npv)
+        fig_energy_flows = plot_daily_energy_flows(result)
+        st.pyplot(fig_energy_flows)
 
         # Ergebnisse speichern
         st.session_state["sim_result"] = result
@@ -279,9 +358,9 @@ with result_tab:
             "lon": lon,
             "year": year,
             "pv_arrays": st.session_state.pv_arrays.to_dict(),
-            "capacity_kwh": capacity_kwh,
-            "power_kw": power_kw,
-            "efficiency": efficiency,
+            "capacity_kwh": st.session_state.capacity_kwh,
+            "power_kw": st.session_state.power_kw,
+            "efficiency": st.session_state.efficiency,
             "selected_modes": selected_modes,
         }
         json_bytes = json.dumps(scenario, indent=2).encode()

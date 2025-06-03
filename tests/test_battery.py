@@ -6,7 +6,7 @@ import numpy as np
 
 def test_battery_basic_simulation():
     # 24h Dummy-Last: 2 kW konstant
-    idx = pd.date_range("2022-01-01", periods=24, freq="H")
+    idx = pd.date_range("2022-01-01", periods=24, freq="h")
     load = pd.Series(2.0, index=idx)
 
     # 24h Dummy-PV: mittags 4 kW, sonst 0
@@ -41,7 +41,7 @@ import matplotlib.figure
 
 def test_plot_battery_result():
     # Dummy-Daten erzeugen
-    idx = pd.date_range("2022-01-01", periods=24, freq="H")
+    idx = pd.date_range("2022-01-01", periods=24, freq="h")
     load = pd.Series(2.0, index=idx)
     pv = pd.Series(0.0, index=idx)
     pv[10:16] = 4.0

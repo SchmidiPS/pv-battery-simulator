@@ -1,132 +1,132 @@
+Hier ist der vollständige Bericht als reiner Text zum direkten Kopieren:
+
 Projektentwurf – Universeller PV‑ & Batteriespeicher‑Simulator
+Stand: 3. Juni 2025
 
-Stand: 2. Juni 2025
+1 Ziel & Vision
 
-1 Ziel & Vision
+Ein Web‑basiertes Tool, das den gesamten Engineering‑ und Wirtschaftlichkeits‑Workflow für PV‑Anlagen und Batteriespeicher automatisiert – von Standortanalyse über Ertragssimulation und Batteriestrategien bis hin zu Visualisierung, Lebensdauerschätzung und Wirtschaftlichkeits‑Empfehlung.
+Unterstützt werden alle gängigen Betriebsmodi: Eigenverbrauch, Peak‑Shaving, Inselbetrieb und Notstrom.
 
-Ein Web‑basiertes Tool, das den gesamten Engineering‑ und Wirtschaftlichkeits‑Workflow für PV‑Anlagen und Batteriespeicher automatisiert – von Standortanalyse über Ertragssimulation bis hin zur Wirtschaftlichkeits‑Empfehlung. Alle gängigen Betriebsmodi (Eigenverbrauch, Peak‑Shaving, Insel, Notstrom) werden unterstützt.
+2 Zielgruppen & Use‑Cases
+Gruppe	Anwendung	Hauptziel
+Privathaushalt	Eigenverbrauch, Backup	Autarkiegrad ↑, Amortisation < 10a
+KMU/Industrie	Peak‑Shaving, dynamische Tarife	Demand‑Charges ↓, NPV ↑
+Off‑Grid Sites	Inselnetz, Dieselreduktion	Autonomie ↑, Kosten ↓
 
-2 Zielgruppen & Use‑Cases
+3 MVP‑Scope (Sprint 1 – aktualisiert)
 
-Gruppe
+Input:
 
-Anwendung
+    Adresse/Koordinaten
 
-Hauptziel
+    Jahreslastprofil (CSV oder Dummy)
 
-Privathaushalt
+    PV‑Konfiguration (kWp, Azimut, Neigung)
 
-Eigenverbrauch, Backup
+    Batteriesystem (Kapazität, Leistung, Wirkungsgrad, DoD, Zyklenlebensdauer)
 
-Autarkiegrad ↑, Amortisation < 10 a
-
-KMU/Industrie
-
-Peak‑Shaving, Dynamische Tarife
-
-Demand‑Charges ↓, NPV ↑
-
-Off‑Grid Site
-
-Inselnetz
-
-Tage Autonomie ↑, Diesel ↓
-
-3 MVP‑Scope (Sprint 1)
-
-Input: Adresse/Koordinaten, Jahreslastprofil (CSV oder Vorlagen), 3 vordefinierte Batteriespeichergrößen
+    Wirtschaftlichkeitsparameter (€/kWh, €/kWp, Installationskosten, Strompreise, Diskontsatz, Lebensdauer)
 
 Funktion:
 
-- Strahlungsdaten via PVGIS‑API (SARAH3, G(h)-Spalte optional)
-- PV‑Ertrag mit pvlib
-- Heuristische Dispatch‑Strategie (Eigenverbrauch)
-- CAPEX/OPEX‑Modell (Listenpreise)
-- Empfehlung (grösster NPV unter 10a Amortisation)
-- GHI optional auf Basis von G(h) oder Komponenten (Summe Diffus+Direkt)
+    PVGIS‑API für Strahlungsdaten
 
-UI: Einfache Streamlit‑App, Download PDF‑Bericht
+    PV‑Ertrag mit pvlib
 
-4 Architektur (High‑Level)
+    Batteriesimulation mit einfachem Eigenverbrauchs‑Dispatch
 
-┌───────────────┐   PVGIS/NASA    ┌───────────────┐
-│  Frontend     │  Weather API    │  CAPEX/OPEX   │
-│  (Streamlit)  │◀───────────────▶│  Datenbank    │
-└──────┬────────┘                 └───────┬──────┘
-       │REST (FastAPI)                    │
-┌──────▼────────┐               ┌────────▼────────┐
-│  Core Engine  │               │   Reporting     │
-│  (Python)     │               │  (PDF/JSON)     │
-└──────┬────────┘               └────────┬────────┘
-       │                                    │
-┌──────▼────────┐               ┌────────▼────────┐
-│   pvlib       │               │  Optimizer      │
-│  (Ertrag)     │               │ (Pyomo/GLPK)    │
-└───────────────┘               └──────────────────┘
+    Lebensdauer‑Abschätzung via Zyklenzählung
 
-5 Technologie‑Stack
+    Wirtschaftlichkeits‑Modul mit:
 
-Python 3.11
+        Investitionskosten
 
-Frameworks: FastAPI, Streamlit
+        jährlicher Ersparnis
 
-Simulation: pvlib, PyPSA (optional ab Sprint 2)
+        Amortisation
 
-Optimierung: Pyomo + CBC/GLPK
+        Kapitalwert (NPV)
 
-Daten: PVGIS, Open‑Nem Stromtarife, eigene Preis‑CSV
+    Visualisierungen:
 
-CI/CD: GitHub Actions, Docker
+        SOC‑Verlauf
 
-6 Offene Punkte / TODO
+        Lade-/Entladeflüsse
 
-- G(h) vs. poa_direct + poa_diffuse GHI‑Rekonstruktion automatisieren
-- PDF‑Export implementieren
-- Wirtschaftlichkeitsmodul verfeinern
-- Interpolation bei Lücken im Lastprofil
+        Tagesenergieflüsse (Stacked Bar)
 
-7 Roadmap (Grob)
+        Anteile Netz/Batterie/PV (100%-Diagramm)
 
-Sprint
+UI:
 
-Dauer
+    Streamlit Dashboard mit Tabs (PV, Batterie, Wirtschaftlichkeit, Simulation)
 
-Deliverable
+    Dynamische Eingaben & Multilingual (DE/EN)
 
-0
+    Standortkarte mit Marker
 
-2 Tage
+    PDF‑Export
 
-Detail‑Scope, Repo‑Setup
+4 Architektur (High‑Level – identisch)
 
-1
+┌───────────────┐ PVGIS/NASA ┌───────────────┐
+│ Frontend │ Weather API │ CAPEX/OPEX │
+│ (Streamlit) │◀───────────────▶│ Datenbank │
+└──────┬────────┘ └───────┬──────┘
+│REST (FastAPI) │
+┌──────▼────────┐ ┌────────▼────────┐
+│ Core Engine │ │ Reporting │
+│ (Python) │ │ (PDF/JSON) │
+└──────┬────────┘ └────────┬────────┘
+│ │
+┌──────▼────────┐ ┌────────▼────────┐
+│ pvlib │ │ Optimizer │
+│ (Ertrag) │ │ (Pyomo/GLPK) │
+└───────────────┘ └──────────────────┘
 
-1 Woche
+5 Technologie‑Stack
 
-MVP laut Abschnitt 3
+    Python 3.11
 
-2
+    Frontend: Streamlit
 
-2 Wochen
+    Backend: FastAPI (optional)
 
-Peak‑Shaving & Gewerbe‑Profiles
+    Simulation: pvlib, heuristischer Dispatch
 
-3
+    Wirtschaftlichkeit: Eigenes CAPEX-Modul + NPV‑Berechnung
 
-2 Wochen
+    Visualisierung: Matplotlib
 
-Off‑Grid & Verschattung
+    PDF‑Export: fpdf
 
+    Datenquellen: PVGIS, CSV (Tarife & Preise)
 
+6 Offene Punkte / TODO (aktualisiert)
 
-Release 1.0 QA
+    GHI-Komponenten automatisch rekonstruieren
 
-8 Prompt‑Guideline für andere LLM‑Sessions
+    PDF‑Export mit Diagrammen integrieren
 
-System Prompt: „Du bist Senior‑Energiesystem‑Engineer. Nutze den untenstehenden Projektentwurf als Kontext und fahre mit den definierten TODOs fort. Ändere nichts außerhalb des aktuellen Abschnitts, falls nicht explizit verlangt.“
+    Vergleichsprofil (ohne Batterie) ergänzen
 
-Kontext: Platziere den Inhalt dieses Dokuments vor jede neue Session oder teile den Link zum Canvas.
+    Erweiterung um Lastverschiebung oder Zeitvarianten (TOU)
 
-9 Versions‑Hinweis
+7 Roadmap (aktualisiert)
+Sprint	Dauer	Deliverable
+Sprint 0	2 Tage	Scope, Repo‑Setup, Dummy-Daten
+Sprint 1	1 Woche	MVP laut Abschnitt 3
+Sprint 2	2 Wochen	Peak Shaving, Gewerbeprofile
+Sprint 3	2 Wochen	Inselbetrieb, Blackout-Szenarien
+Release 1.0 QA	1 Woche	Volltest, Usability, Performanceoptimierung
 
-Dieses Dokument ist das Single Source of Truth. Änderungen bitte hier oder per Pull‑Request mit Verweis auf die Zeile/Section.
+8 Prompt‑Guideline für andere LLM‑Sessions
+
+System Prompt:
+„Du bist Senior‑Energiesystem‑Engineer. Nutze den untenstehenden Projektentwurf als Kontext und fahre mit den definierten TODOs fort. Ändere nichts außerhalb des aktuellen Abschnitts, falls nicht explizit verlangt.“
+
+9 Versions‑Hinweis
+
+Dieses Dokument ist das Single Source of Truth.
+Änderungen ausschließlich hier oder via Pull Request mit Verweis auf Abschnitt/Zeile.

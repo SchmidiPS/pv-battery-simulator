@@ -12,20 +12,16 @@ def simulate_battery(
     """
     Simuliert einfache Batteriespeicherung für Eigenverbrauchsoptimierung.
 
-    Parameters:
-    - load: Verbrauchsprofil (kW)
-    - pv: PV-Ertrag (kW)
-    - capacity_kwh: Batteriekapazität (kWh)
-    - charge_power_kw / discharge_power_kw: Lade-/Entladeleistung (kW)
-    - efficiency: round-trip-Wirkungsgrad (0.95 = 95%)
-    - timestep_hours: Zeitschrittgröße (i.d.R. 1h)
-
     Returns:
-    - DataFrame mit Spalten: SOC, charge, discharge, grid_import, grid_export
+    - DataFrame mit Spalten:
+      soc [%], charge, discharge, grid_import, grid_export,
+      from_battery, to_battery
     """
     index = load.index
-    soc = 0.0
+    soc = 0.0  # in kWh
     results = []
+
+    pv = pv.clip(lower=0)
 
     for t in index:
         demand = load[t]
@@ -35,22 +31,38 @@ def simulate_battery(
         charge = 0.0
         discharge = 0.0
 
-        # Energieüberschuss → laden
         if surplus > 0:
+            # Laden
             available = min(surplus, charge_power_kw) * efficiency
             charge = min(available * timestep_hours, capacity_kwh - soc)
             soc += charge
             grid_export = surplus - (charge / efficiency)
             grid_import = 0.0
 
-        # Energiemangel → entladen
         else:
+            # Entladen
             needed = min(-surplus, discharge_power_kw)
             discharge = min(soc, needed * timestep_hours)
             soc -= discharge
             grid_import = (-surplus) - (discharge / efficiency)
             grid_export = 0.0
 
-        results.append((soc, charge, discharge, grid_import, grid_export))
+        grid_import = max(grid_import, 0.0)
+        grid_export = max(grid_export, 0.0)
 
-    return pd.DataFrame(results, index=index, columns=["soc", "charge", "discharge", "grid_import", "grid_export"])
+        # Energieflüsse (nach außen sichtbare Energie, keine Verluste inkludiert)
+        to_battery = charge
+        from_battery = discharge
+
+        results.append((
+            soc, charge, discharge, grid_import, grid_export,
+            from_battery, to_battery
+        ))
+
+    df = pd.DataFrame(results, index=index, columns=[
+        "soc", "charge", "discharge", "grid_import", "grid_export",
+        "from_battery", "to_battery"
+    ])
+    df["soc_%"] = df["soc"] / capacity_kwh * 100
+
+    return df

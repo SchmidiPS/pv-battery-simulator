@@ -38,15 +38,12 @@ Input: Adresse/Koordinaten, Jahreslastprofil (CSV oder Vorlagen), 3 vordefiniert
 
 Funktion:
 
-Strahlungsdaten via PVGIS‑API
-
-PV‑Ertrag mit pvlib
-
-Heuristische Dispatch‑Strategie (Eigenverbrauch)
-
-CAPEX/OPEX‑Modell (Listenpreise)
-
-Empfehlung (grösster NPV unter 10a Amortisation)
+- Strahlungsdaten via PVGIS‑API (SARAH3, G(h)-Spalte optional)
+- PV‑Ertrag mit pvlib
+- Heuristische Dispatch‑Strategie (Eigenverbrauch)
+- CAPEX/OPEX‑Modell (Listenpreise)
+- Empfehlung (grösster NPV unter 10a Amortisation)
+- GHI optional auf Basis von G(h) oder Komponenten (Summe Diffus+Direkt)
 
 UI: Einfache Streamlit‑App, Download PDF‑Bericht
 
@@ -83,7 +80,10 @@ CI/CD: GitHub Actions, Docker
 
 6 Offene Punkte / TODO
 
-
+- G(h) vs. poa_direct + poa_diffuse GHI‑Rekonstruktion automatisieren
+- PDF‑Export implementieren
+- Wirtschaftlichkeitsmodul verfeinern
+- Interpolation bei Lücken im Lastprofil
 
 7 Roadmap (Grob)
 
@@ -117,9 +117,7 @@ Peak‑Shaving & Gewerbe‑Profiles
 
 Off‑Grid & Verschattung
 
-​
 
-​
 
 Release 1.0 QA
 
@@ -132,5 +130,3 @@ Kontext: Platziere den Inhalt dieses Dokuments vor jede neue Session oder teile 
 9 Versions‑Hinweis
 
 Dieses Dokument ist das Single Source of Truth. Änderungen bitte hier oder per Pull‑Request mit Verweis auf die Zeile/Section.
-
-

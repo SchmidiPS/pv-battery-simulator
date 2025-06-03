@@ -18,5 +18,11 @@ dependencies:
   - uvicorn
   # PDF
   - fpdf2
+  # Geo / Karten
+  - geopy
+  - folium
+  - pip
+  - pip:
+      - streamlit-folium
   # Dev / Test
   - pytest

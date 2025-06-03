@@ -7,42 +7,63 @@ def set_theme_css(theme_name: str):
         st.markdown(
             """
             <style>
-            /* Hauptbereich Hintergrund und Text */
-            [data-testid="stAppViewContainer"] > div:first-child {
-                background-color: rgb(254, 251, 248) !important;
-                color: #000000 !important;
-            }
-            /* Sidebar Hintergrund */
-            [data-testid="stSidebar"] {
-                background-color: rgb(254, 251, 248) !important;
-                color: #000000 !important;
-            }
-            /* Hauptinhalt */
+            /* Hauptbereich & Sidebar Hintergrund und Text */
+            [data-testid="stAppViewContainer"] > div:first-child,
+            [data-testid="stSidebar"],
             [data-testid="stMain"] {
                 background-color: rgb(254, 251, 248) !important;
-                color: #000000 !important;
+                color: #004080 !important;  /* Blaue Schrift */
             }
-            /* Eingabeelemente - Input, Slider, Select */
+
+            /* Überschriften */
+            h1, h2, h3, h4, h5 {
+                color: #003366 !important;
+            }
+
+            /* Text- und Number Input */
             .stTextInput > div > div > input,
-            .stNumberInput > div > div > input,
-            .stSelectbox > div > div > div > div,
-            .stSlider > div > div > input {
-                background-color: #e6f0ff !important;  /* sehr helles Blau */
-                color: #004080 !important;  /* dunkles Blau */
-                border: 1px solid #a0c4ff !important;  /* helles Blau als Rahmen */
+            .stNumberInput > div > div > input {
+                background-color: #e6f0ff !important;
+                color: #004080 !important;
+                border: 1px solid #a0c4ff !important;
                 border-radius: 5px !important;
             }
+
+            /* Selectbox Dropdown (nur das sichtbare Feld) */
+            .stSelectbox > div > div > div > div {
+                background-color: #e6f0ff !important;
+                color: #004080 !important;
+                border: 1px solid #a0c4ff !important;
+                border-radius: 5px !important;
+            }
+
+            /* Checkbox Label und Text */
+            .stCheckbox > label > div[data-baseweb="checkbox"] {
+                border: 1px solid #a0c4ff !important;
+                background-color: #e6f0ff !important;
+                border-radius: 3px !important;
+            }
+            .stCheckbox > label > div > span {
+                color: #004080 !important;
+            }
+
+            /* Radio Buttons */
+            .stRadio > label > div[data-baseweb="radio"] {
+                border: 1px solid #a0c4ff !important;
+                background-color: #e6f0ff !important;
+                border-radius: 50% !important;
+            }
+            .stRadio > label > div > span {
+                color: #004080 !important;
+            }
+
             /* Buttons */
-            .stButton>button {
+            .stButton > button {
                 background-color: #007acc !important;
                 color: white !important;
                 border: none !important;
                 border-radius: 5px !important;
                 font-weight: 600;
-            }
-            /* Überschriftenfarbe */
-            h1, h2, h3, h4, h5 {
-                color: #003366 !important;
             }
             </style>
             """,
@@ -50,5 +71,6 @@ def set_theme_css(theme_name: str):
         )
     else:
         pass
+
 
 

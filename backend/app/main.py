@@ -23,6 +23,7 @@ from geopy.geocoders import Nominatim
 import folium
 from streamlit_folium import st_folium
 from PIL import Image
+from core.theme import set_theme_css
 
 # ───────────────────────── Streamlit Page Config ─────────────────────────
 st.set_page_config(
@@ -31,6 +32,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 
 # ────────────────────────────── I18N Dict ───────────────────────────────
 LANG: dict[str, dict[str, str]] = {
@@ -44,7 +46,7 @@ LANG: dict[str, dict[str, str]] = {
         "no_load": "Kein Lastprofil hochgeladen – Dummy‑Profil wird genutzt.",
         "modes": "Betriebsmodi",
         "pv_tab": "PV‑Konfiguration",
-        "batt_tab": "Batterie & Modi",
+        "batt_tab": "Batterie-Konfiguration",
         "economics_tab": "Wirtschaftlichkeit & KPIs",
         "result_tab": "Simulation & Plots",
         "run": "Simulation starten",
@@ -62,7 +64,7 @@ LANG: dict[str, dict[str, str]] = {
         "no_load": "No load profile uploaded – using dummy profile.",
         "modes": "Operating modes",
         "pv_tab": "PV configuration",
-        "batt_tab": "Battery & modes",
+        "batt_tab": "Battery configuration",
         "economics_tab": "Economics & KPIs",
         "result_tab": "Simulation & plots",
         "run": "Run simulation",
@@ -98,6 +100,9 @@ with st.sidebar:
     theme_choice = st.selectbox("Theme", ["light", "dark"], key="theme_select")
     st.session_state["theme"] = theme_choice
 
+    # Theme-CSS anwenden
+    set_theme_css(st.session_state["theme"])
+
     st.title(T["general"])
 
     # Adresse oder Koordinaten
@@ -125,13 +130,20 @@ with st.sidebar:
     year = st.number_input(T["year"], value=2022, step=1)
 
     st.subheader("Lastprofil")
-    upload = st.file_uploader(T["upload"], type="csv")
-    if upload is not None:
-        load_df = pd.read_csv(upload, parse_dates=[0], index_col=0)
-        st.success(f"✓ {len(load_df)} Zeilen geladen")
+    load_option = st.radio("Lastprofil wählen", ("CSV-Upload", "Konstanter Verbrauch"), index=1)
+
+    if load_option == "CSV-Upload":
+        upload = st.file_uploader(T["upload"], type="csv")
+        if upload is not None:
+            st.session_state.load_df = pd.read_csv(upload, parse_dates=[0], index_col=0)
+            st.success(f"✓ {len(st.session_state.load_df)} Zeilen geladen")
+        else:
+            st.session_state.load_df = None
+            st.info(T["no_load"])
     else:
-        load_df = None
-        st.info(T["no_load"])
+        st.session_state.constant_load = st.number_input("Konstanter Verbrauch pro Stunde (kW)", min_value=0.0, value=5.0)
+        st.session_state.load_df = None
+
 
     st.subheader(T["modes"])
     mode_opts = ["Eigenverbrauch", "Peak Shaving", "Inselbetrieb", "Notstrom"]
@@ -158,7 +170,7 @@ if "lat" in st.session_state and "lon" in st.session_state:
 
     map_view = folium.Map(
         location=[st.session_state["lat"], st.session_state["lon"]],
-        zoom_start=13,
+        zoom_start=22,
         tiles="OpenStreetMap"
     )
     folium.Marker(
@@ -264,9 +276,12 @@ with result_tab:
         pv_total = pv_series if pv_total is None else pv_total.add(pv_series, fill_value=0)
         ghi_total = ghi_series if ghi_total is None else ghi_total.add(ghi_series, fill_value=0)
 
+        load_df = st.session_state.get("load_df", None)
+        constant_load = st.session_state.get("constant_load", 5.0)
+
         # Lastserie
         if load_df is None:
-            load_series = pd.Series(5.0, index=pv_total.index)
+            load_series = pd.Series(constant_load, index=pv_total.index)
         else:
             load_series = load_df.squeeze().reindex(pv_total.index, method="nearest").fillna(method="ffill")
 
@@ -303,7 +318,10 @@ with result_tab:
         # Einsparungen pro Jahr
         grid_import = result["grid_import"].sum()
         grid_export = result["grid_export"].sum()
-        savings_per_year = grid_import * st.session_state.price_buy - grid_export * st.session_state.price_feed
+        baseline_cost = load_series.sum() * st.session_state.price_buy
+        actual_cost = grid_import * st.session_state.price_buy - grid_export * st.session_state.price_feed
+        savings_per_year = baseline_cost - actual_cost
+
 
         # Amortisation & Kapitalwert
         amortisation_years = total_investment / savings_per_year if savings_per_year > 0 else float("inf")

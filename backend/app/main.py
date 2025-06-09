@@ -34,129 +34,18 @@ st.set_page_config(
 )
 
 
-# ────────────────────────────── I18N Dict ───────────────────────────────
-LANG: dict[str, dict[str, str]] = {
-    "Deutsch": {
-        "title": "PV‑ & Batteriespeicher‑Simulator",
-        "general": "Allgemeine Eingaben",
-        "latitude": "Breitengrad",
-        "longitude": "Längengrad",
-        "year": "Jahr",
-        "upload": "CSV‑Datei hochladen (Zeit, kW)",
-        "no_load": "Kein Lastprofil hochgeladen – Dummy‑Profil wird genutzt.",
-        "modes": "Betriebsmodi",
-        "pv_tab": "PV‑Konfiguration",
-        "batt_tab": "Batterie-Konfiguration",
-        "economics_tab": "Wirtschaftlichkeit & KPIs",
-        "result_tab": "Simulation & Plots",
-        "run": "Simulation starten",
-        "save": "Szenario speichern",
-        "load": "Szenario laden (JSON)",
-        "export": "PDF‑Export",
-    },
-    "English": {
-        "title": "PV & Battery Storage Simulator",
-        "general": "General inputs",
-        "latitude": "Latitude",
-        "longitude": "Longitude",
-        "year": "Year",
-        "upload": "Upload CSV (time,kW)",
-        "no_load": "No load profile uploaded – using dummy profile.",
-        "modes": "Operating modes",
-        "pv_tab": "PV configuration",
-        "batt_tab": "Battery configuration",
-        "economics_tab": "Economics & KPIs",
-        "result_tab": "Simulation & plots",
-        "run": "Run simulation",
-        "save": "Save scenario",
-        "load": "Load scenario (JSON)",
-        "export": "PDF export",
-    },
-}
 
 
 # ─────────────────────────── Sidebar (UI) ───────────────────────────────
-with st.sidebar:
-    logo_path = Path(__file__).resolve().parents[2] / "images" / "logo.png"
-    logo_img = Image.open(logo_path)
-    st.image(logo_img, use_container_width=True)
+from ui.sidebar import build_sidebar
+state = build_sidebar()
 
-    st.title("Language / Sprache")
-    col1, col2 = st.columns(2)
-    if "language" not in st.session_state:
-        st.session_state.language = "Deutsch"
-
-    with col1:
-        if st.button("🇩🇪", use_container_width=True):
-            st.session_state.language = "Deutsch"
-
-    with col2:
-        if st.button("🇬🇧", use_container_width=True):
-            st.session_state.language = "English"
-
-    T = LANG[st.session_state.language]
-
-
-    theme_choice = st.selectbox("Theme", ["light", "dark"], key="theme_select")
-    st.session_state["theme"] = theme_choice
-
-    # Theme-CSS anwenden
-    set_theme_css(st.session_state["theme"])
-
-    st.title(T["general"])
-
-    # Adresse oder Koordinaten
-    use_address = st.checkbox("Adresse statt Koordinaten")
-
-    if use_address:
-        address_input = st.text_input("Adresse", "Fürstenweg 42, Innsbruck")
-        if address_input:
-            from geopy.geocoders import Nominatim
-            geolocator = Nominatim(user_agent="battery-sim")
-            location = geolocator.geocode(address_input)
-            if location:
-                lat, lon = location.latitude, location.longitude
-                st.session_state["lat"] = lat
-                st.session_state["lon"] = lon
-            else:
-                st.warning("Adresse nicht gefunden.")
-                lat = lon = None
-    else:
-        lat = st.number_input(T["latitude"], value=47.26, format="%.4f")
-        lon = st.number_input(T["longitude"], value=11.38, format="%.4f")
-        st.session_state["lat"] = lat
-        st.session_state["lon"] = lon
-
-    year = st.number_input(T["year"], value=2022, step=1)
-
-    st.subheader("Lastprofil")
-    load_option = st.radio("Lastprofil wählen", ("CSV-Upload", "Konstanter Verbrauch"), index=1)
-
-    if load_option == "CSV-Upload":
-        upload = st.file_uploader(T["upload"], type="csv")
-        if upload is not None:
-            st.session_state.load_df = pd.read_csv(upload, parse_dates=[0], index_col=0)
-            st.success(f"✓ {len(st.session_state.load_df)} Zeilen geladen")
-        else:
-            st.session_state.load_df = None
-            st.info(T["no_load"])
-    else:
-        st.session_state.constant_load = st.number_input("Konstanter Verbrauch pro Stunde (kW)", min_value=0.0, value=5.0)
-        st.session_state.load_df = None
-
-
-    st.subheader(T["modes"])
-    mode_opts = ["Eigenverbrauch", "Peak Shaving", "Inselbetrieb", "Notstrom"]
-    selected_modes = st.multiselect(T["modes"], mode_opts, default=["Eigenverbrauch"])
-
-    st.subheader(T["load"])
-    load_json = st.file_uploader(T["load"], type="json")
-    if load_json is not None:
-        cfg = json.load(load_json)
-        st.session_state.update(cfg)
-        st.success("Szenario geladen – Seite neu laden!")
-
-    st.caption("© 2025 batteriespeicher24.ch")
+T = state["T"]
+lat = state["lat"]
+lon = state["lon"]
+year = state["year"]
+selected_modes = state["selected_modes"]
+load_df = state["load_df"]      # ersetzt st.session_state.load_df
 
 
 # ─────────────────────────── Haupttitel ────────────────────────────────
@@ -249,171 +138,54 @@ with econ_tab:
 
 
 # ───────── Tab 3 – Simulation & Plots ──────────────────────────────────
+from services.simulation import run as run_sim
+from core.visualize import (
+    plot_full_simulation_with_irradiance,
+    plot_daily_energy_flows,
+)
+
 with result_tab:
     sim_placeholder = st.empty()
 
     if st.button(T["run"], use_container_width=True):
-        from core.pv_sim import simulate_pv
-        from core.battery import simulate_battery
-        from core.visualize import plot_full_simulation_with_irradiance, plot_daily_energy_flows
+        sim_placeholder.info("⏳ Simulation läuft …")
+        result = run_sim(st.session_state)
 
-        sim_placeholder.info("⏳ Simulation läuft …")
+        # Serien + KPIs abholen
+        pv_total   = result["pv_total"]
+        ghi_total  = result["ghi_total"]
+        load       = result["load"]
+        batt       = result["batt"]
+        kpi        = result["kpi"]
 
-        # PV‑Summe über alle Arrays + GHI
-        pv_total = None
-        ghi_total = None
-        for _, pv_row in st.session_state.pv_arrays.iterrows():
-            pv_series, ghi_series = simulate_pv(
-            lat=lat,
-            lon=lon,
-            kwp=pv_row["kWp"],
-            tilt=pv_row["Tilt"],
-            azimuth=pv_row["Azimut"],
-            loss=14,
-            coerce_year=year
-        )
-        
-        pv_total = pv_series if pv_total is None else pv_total.add(pv_series, fill_value=0)
-        ghi_total = ghi_series if ghi_total is None else ghi_total.add(ghi_series, fill_value=0)
-
-        load_df = st.session_state.get("load_df", None)
-        constant_load = st.session_state.get("constant_load", 5.0)
-
-        # Lastserie
-        if load_df is None:
-            load_series = pd.Series(constant_load, index=pv_total.index)
-        else:
-            load_series = load_df.squeeze().reindex(pv_total.index, method="nearest").fillna(method="ffill")
-
-        # Batteriesimulation
-        result = simulate_battery(
-            load_series,
-            pv_total,
-            st.session_state.capacity_kwh,
-            st.session_state.power_kw,
-            st.session_state.power_kw,
-            st.session_state.efficiency / 100
-        )
-        
-        # Systemparameter nach Simulation anzeigen
+        # ---------- UI-Anzeige ----------
         st.subheader("🔋 Systemübersicht")
         col1, col2, col3, col4, col5 = st.columns(5)
-
-        col1.metric("PV-Leistung (kWp)", f"{st.session_state.pv_arrays['kWp'].sum():.2f}")
-        col2.metric("Batterie-Kapazität (kWh)", f"{st.session_state.capacity_kwh:.1f}")
-        col3.metric("WR-Leistung (kW)", f"{st.session_state.power_kw:.1f}")
-        col4.metric("Jahreslast (kWh)", f"{load_series.sum():,.0f}")
-        col5.metric("PV-Ertrag (kWh)", f"{pv_total.sum():,.0f}")
-
-        # ───────── KPIs anzeigen – nach Systemübersicht, vor Plot ─────────
-        autarkie = 100 * (1 - result["grid_import"].sum() / load_series.sum())
-
-        # Investitionskosten berechnen
-        pv_kwp = st.session_state.pv_arrays["kWp"].sum()
-        pv_cost = pv_kwp * st.session_state.price_pv_kwp
-        batt_cost = st.session_state.capacity_kwh * st.session_state.price_batt_kwh
-        install_cost = st.session_state.install_costs
-        total_investment = pv_cost + batt_cost + install_cost
-
-        # Einsparungen pro Jahr
-        grid_import = result["grid_import"].sum()
-        grid_export = result["grid_export"].sum()
-        baseline_cost = load_series.sum() * st.session_state.price_buy
-        actual_cost = grid_import * st.session_state.price_buy - grid_export * st.session_state.price_feed
-        savings_per_year = baseline_cost - actual_cost
-
-
-        # Amortisation & Kapitalwert
-        amortisation_years = total_investment / savings_per_year if savings_per_year > 0 else float("inf")
-        npv = sum([
-            savings_per_year / ((1 + st.session_state.discount_rate) ** t)
-            for t in range(1, st.session_state.lifetime_years + 1)
-        ]) - total_investment
-
-
-        # Lebensdauerberechnung basierend auf SOC-Zyklen
-        soc_normalized = result["soc_%"] / 100
-        soc_diff = soc_normalized.diff().abs()
-        total_cycles = soc_diff.sum() / 2  # entspricht Vollzyklen
-
-        # Lebensdauer (Jahre) schätzen – st.session_state.cycles_dod muss vorhanden sein
-        sim_years = len(result) / 8760  # 8760 Stunden/Jahr
-        batt_lifetime_years = (st.session_state.cycles_dod / total_cycles) * sim_years if total_cycles > 0 else float("inf")
+        col1.metric("PV-Leistung (kWp)",  f"{st.session_state.pv_arrays['kWp'].sum():.2f}")
+        col2.metric("Batterie (kWh)",     f"{st.session_state.capacity_kwh:.1f}")
+        col3.metric("WR-Leistung (kW)",   f"{st.session_state.power_kw:.1f}")
+        col4.metric("Jahreslast (kWh)",   f"{load.sum():,.0f}")
+        col5.metric("PV-Ertrag (kWh)",    f"{pv_total.sum():,.0f}")
 
         st.subheader("📈 Wirtschaftlichkeit")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Gesamtkosten",  f"{kpi['invest']:,.0f} €")
+        c2.metric("Ersparnis / Jahr", f"{kpi['savings']:,.0f} €")
+        c3.metric("Autarkie",      f"{kpi['autarkie']:.1f} %")
+        c4, c5, c6 = st.columns(3)
+        c4.metric("Amortisation",  f"{kpi['amort']:.1f} Jahre" if kpi['amort']<100 else "–")
+        c5.metric("Batterielebensdauer", f"{kpi['batt_lifetime']:.1f} Jahre")
+        c6.metric("NPV",           f"{kpi['npv']:,.0f} €")
 
-        # KPI‑Badges anzeigen
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Gesamtkosten", f"{total_investment:,.0f} €")
-        col2.metric("Ersparnis / Jahr", f"{savings_per_year:,.0f} €")
-        col3.metric("Autarkie", f"{autarkie:.1f} %")
+        # Plots
+        st.subheader("📊 Visualisierung")
+        st.pyplot(plot_full_simulation_with_irradiance(load, pv_total, ghi_total, batt))
+        st.pyplot(plot_daily_energy_flows(batt))
 
-        col4, col5, col6 = st.columns(3)
-        col4.metric("Amortisation", f"{amortisation_years:.1f} Jahre" if amortisation_years < 100 else "–")
-        col5.metric("Batterielebensdauer", f"{batt_lifetime_years:.1f} Jahre")
-        col6.metric("NPV", f"{npv:,.0f} €")
-
-
-        st.subheader("📊 Visualisierung der Simulation")
-
-        # Visualisierung
-        fig = plot_full_simulation_with_irradiance(load_series, pv_total, ghi_total, result)
-        st.pyplot(fig, use_container_width=True)
-
-        fig_energy_flows = plot_daily_energy_flows(result)
-        st.pyplot(fig_energy_flows)
-
-        # Ergebnisse speichern
+        # Ergebnisse in session_state für PDF / Download
         st.session_state["sim_result"] = result
-        st.session_state["load_series"] = load_series
-        st.session_state["lat"] = lat
-        st.session_state["lon"] = lon
-        st.session_state["autarkie"] = autarkie
+        st.session_state["autarkie"]   = kpi["autarkie"]
 
-        # Szenario speichern – JSON in Download‑Button
-        scenario = {
-            "lat": lat,
-            "lon": lon,
-            "year": year,
-            "pv_arrays": st.session_state.pv_arrays.to_dict(),
-            "capacity_kwh": st.session_state.capacity_kwh,
-            "power_kw": st.session_state.power_kw,
-            "efficiency": st.session_state.efficiency,
-            "selected_modes": selected_modes,
-        }
-        json_bytes = json.dumps(scenario, indent=2).encode()
-        st.download_button(
-            T["save"],
-            data=json_bytes,
-            file_name="scenario.json",
-            mime="application/json"
-        )
-
-        sim_placeholder.success("✅ Simulation abgeschlossen")
-
-    # PDF‑Export (außerhalb vom Button-Block)
-    if "sim_result" in st.session_state and st.button(T["export"]):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-
-        report_text = (
-            "BatterySimTool - Simulation Report\n"
-            f"Datum:   {dt.datetime.now():%d.%m.%Y %H:%M}\n"
-            f"Standort: {st.session_state['lat']:.4f}, {st.session_state['lon']:.4f}\n"
-            f"Autarkie: {st.session_state['autarkie']:.1f}%"
-        )
-        pdf.multi_cell(0, 10, report_text)
-
-        # Als Bytes exportieren
-        pdf_bytes = pdf.output(dest="S").encode("latin1")
-        pdf_buffer = io.BytesIO(pdf_bytes)
-
-        st.download_button(
-            label="📄 PDF Download",
-            data=pdf_buffer,
-            file_name=f"report_{dt.datetime.now():%Y%m%d_%H%M%S}.pdf",
-            mime="application/pdf",
-        )
+        sim_placeholder.success("✅ Simulation abgeschlossen")
 
 
